@@ -516,6 +516,26 @@ class AzCliCommandInvoker(CommandInvoker):
         # TODO: Can't simply be invoked as an event because args are transformed
         args = _pre_command_table_create(self.cli_ctx, args)
 
+        # Early detection for root help to avoid loading all command modules
+        # Check if this is a request for root help (az --help, az -h, az help)
+        # Note: Help cache is disabled by default because it currently shows help without
+        # command/group summaries. Getting summaries requires loading help metadata files,
+        # which defeats the performance benefit of caching. Users can enable it with:
+        #   az config set core.use_help_cache=true
+        # This provides ~90% speed improvement (12s -> 1.2s) at the cost of missing summaries.
+        use_help_cache = self.cli_ctx.config.getboolean('core', 'use_help_cache', fallback=False)
+        if use_help_cache and self._is_root_help_request(args):
+            from azure.cli.core import HelpIndex
+            help_index = HelpIndex(self.cli_ctx)
+            cached_help = help_index.get()
+            
+            if cached_help:
+                logger.debug("Using cached help index, skipping command table load.")
+                # Show help from cache without loading command modules
+                return self._show_help_from_cache(cached_help)
+            else:
+                logger.debug("Help cache miss or invalid, will build and cache after loading.")
+
         self.cli_ctx.raise_event(EVENT_INVOKER_PRE_CMD_TBL_CREATE, args=args)
         self.commands_loader.load_command_table(args)
         self.cli_ctx.raise_event(EVENT_INVOKER_PRE_CMD_TBL_TRUNCATE,
@@ -935,6 +955,52 @@ class AzCliCommandInvoker(CommandInvoker):
             delattr(ns, '_argument_validators')
         except AttributeError:
             pass
+
+    def _is_root_help_request(self, args):
+        """Check if this is a request for root-level help (az --help, az -h, az help)."""
+        if not args:
+            return False
+        # Check for: az --help, az -h, az help
+        if len(args) == 1 and args[0] in ('--help', '-h', 'help'):
+            return True
+        return False
+
+    def _show_help_from_cache(self, cached_help):
+        """Display help using cached help index without loading command modules."""
+        from azure.cli.core import telemetry
+        
+        # Set telemetry for help
+        telemetry.set_command_details('az', self.data['output'], [])
+        telemetry.set_success(summary='show help from cache')
+        
+        # Print welcome message
+        if self.help.welcome_message:
+            print(self.help.welcome_message)
+            print()
+        
+        # Print command groups
+        groups = cached_help.get('groups', [])
+        if groups:
+            print('Group')
+            max_name_len = max(len(g['name']) for g in groups) if groups else 20
+            for group in groups:
+                summary = group.get('summary', '')
+                padding = ' ' * (max_name_len - len(group['name']) + 4)
+                print(f"    {group['name']}{padding}: {summary}")
+            print()
+        
+        # Print commands
+        commands = cached_help.get('commands', [])
+        if commands:
+            print('Commands:')
+            max_name_len = max(len(c['name']) for c in commands) if commands else 20
+            for command in commands:
+                summary = command.get('summary', '')
+                padding = ' ' * (max_name_len - len(command['name']) + 4)
+                print(f"    {command['name']}{padding}: {summary}")
+            print()
+        
+        return CommandResultItem(None, exit_code=0)
 
 
 class LongRunningOperation:  # pylint: disable=too-few-public-methods
