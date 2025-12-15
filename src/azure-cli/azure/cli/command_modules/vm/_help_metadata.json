@@ -1,0 +1,349 @@
+{
+  "name": "vm",
+  "help": "Manage Linux or Windows virtual machines.",
+  "version": "2.81.0",
+  "groups": [
+    {
+      "name": "vmss",
+      "help": "Manage groupings of virtual machines in an Azure Virtual Machine Scale Set (VMSS).",
+      "commands": [
+        {
+          "name": "create",
+          "help": "Create an Azure Virtual Machine Scale Set. For an end-to-end tutorial, see https://learn.microsoft.com/azure/virtual-machine-scale-sets/virtual-machine-scale-sets-linux-create-cli.",
+          "examples": [
+            {
+              "name": "Create a Windows VM scale set with 5 instances, a load balancer, a public IP address, a 2GB data disk and 40GB OS disk.",
+              "text": "az vmss create -n MyVmss -g MyResourceGroup --instance-count 5 --image Win2016Datacenter --data-disk-sizes-gb 2 --os-disk-size-gb 40"
+            },
+            {
+              "name": "Create a Linux VM scale set with an auto-generated ssh key pair, a public IP address, a DNS entry, an existing load balancer, and an existing virtual network.",
+              "text": "az vmss create -n MyVmss -g MyResourceGroup --public-ip-address-dns-name my-globally-dns-name --load-balancer MyLoadBalancer --vnet-name MyVnet --subnet MySubnet --image Ubuntu2204 --generate-ssh-keys"
+            },
+            {
+              "name": "Create a Linux VM scale set from a custom image using the default existing public SSH key.",
+              "text": "az vmss create -n MyVmss -g MyResourceGroup --image MyImage"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "--image",
+              "type": "string",
+              "help": "The name of the operating system image as a URN alias, URN, custom image name or ID, or VHD blob URI. In addition, it also supports shared gallery image. Please use the image alias including the version of the distribution you want to use. For example: please use Debian11 instead of Debian. This parameter is required unless using `--attach-os-disk.` Valid URN format: \"Publisher:Offer:Sku:Version\". For more information, see https://learn.microsoft.com/azure/virtual-machines/linux/cli-ps-findimage"
+            },
+            {
+              "name": "--ssh-key-values",
+              "type": "string",
+              "help": "Space-separated list of SSH public keys or public key file paths."
+            }
+          ]
+        },
+        {
+          "name": "deallocate",
+          "help": "Deallocate VMs within a VMSS.",
+          "examples": [
+            {
+              "name": "Deallocate VMs within a VMSS.",
+              "text": "az vmss deallocate --instance-ids 1 --name MyScaleSet --resource-group MyResourceGroup"
+            }
+          ],
+          "parameters": []
+        }
+      ],
+      "groups": [
+        {
+          "name": "diagnostics",
+          "help": "Configure the Azure Virtual Machine Scale Set diagnostics extension.",
+          "commands": [
+            {
+              "name": "get-default-config",
+              "help": "Show the default config file which defines data to be collected.",
+              "examples": [],
+              "parameters": []
+            },
+            {
+              "name": "set",
+              "help": "Enable diagnostics on a VMSS.",
+              "examples": [
+                {
+                  "name": "Enable diagnostics on a VMSS.",
+                  "text": "az vmss diagnostics set --protected-settings {protected-settings} --resource-group MyResourceGroup --settings '{\"commandToExecute\": \"echo testing\"}' --vmss-name MyVmss"
+                }
+              ],
+              "parameters": []
+            }
+          ]
+        },
+        {
+          "name": "disk",
+          "help": "Manage data disks of a VMSS.",
+          "commands": [
+            {
+              "name": "attach",
+              "help": "Attach managed data disks to a scale set or its instances.",
+              "examples": [
+                {
+                  "name": "Attach managed data disks to a scale set or its instances.",
+                  "text": "az vmss disk attach --disk {disk} --instance-id 0 --resource-group MyResourceGroup"
+                },
+                {
+                  "name": "Attach managed data disks of a given size to a scale set or its instances.",
+                  "text": "az vmss disk attach --vmss-name MyVmss --resource-group MyResourceGroup --size-gb 50"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "name": "detach",
+              "help": "Detach managed data disks from a scale set or its instances.",
+              "examples": [
+                {
+                  "name": "Detach managed data disks from a scale set or its instances.",
+                  "text": "az vmss disk detach --instance-id 0 --lun {lun} --resource-group MyResourceGroup"
+                }
+              ],
+              "parameters": []
+            }
+          ]
+        },
+        {
+          "name": "encryption",
+          "help": "Manage encryption of VMSS. For more information, see: ttps://learn.microsoft.com/azure/security/fundamentals/azure-disk-encryption-vms-vmss",
+          "commands": [
+            {
+              "name": "disable",
+              "help": "Disable the encryption on a VMSS with managed disks.",
+              "examples": [
+                {
+                  "name": "disable encryption a VMSS",
+                  "text": "az vmss encryption disable -g MyResourceGroup -n MyVm"
+                }
+              ],
+              "parameters": []
+            },
+            {
+              "name": "enable",
+              "help": "Encrypt a VMSS with managed disks. For more information, see: ttps://learn.microsoft.com/azure/security/fundamentals/azure-disk-encryption-vms-vmss",
+              "examples": [
+                {
+                  "name": "encrypt a VM scale set using a key vault in the same resource group",
+                  "text": "az vmss encryption enable -g MyResourceGroup -n MyVmss --disk-encryption-keyvault MyVault"
+                },
+                {
+                  "name": "Add support for using managed identity to authenticate to customer's keyvault for ADE operation",
+                  "text": "az vmss encryption enable --disk-encryption-keyvault MyVault --name MyVm --resource-group MyResourceGroup --encryption-identity EncryptionIdentity"
+                }
+              ],
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "disk",
+      "help": "Manage data disks of a VM.",
+      "commands": [
+        {
+          "name": "attach",
+          "help": "Attach a managed persistent disk to a VM.",
+          "examples": [],
+          "parameters": []
+        },
+        {
+          "name": "detach",
+          "help": "Detach a managed disk from a VM.",
+          "examples": [],
+          "parameters": []
+        }
+      ]
+    },
+    {
+      "name": "boot-diagnostics",
+      "help": "Troubleshoot the startup of an Azure Virtual Machine.",
+      "commands": [
+        {
+          "name": "disable",
+          "help": "Disable the boot diagnostics on a VM.",
+          "examples": [],
+          "parameters": []
+        },
+        {
+          "name": "enable",
+          "help": "Enable the boot diagnostics on a VM.",
+          "examples": [],
+          "parameters": []
+        },
+        {
+          "name": "get-boot-log",
+          "help": "Get the boot diagnostics log from a VM.",
+          "examples": [],
+          "parameters": []
+        },
+        {
+          "name": "get-boot-log-uris",
+          "help": "Get SAS URIs for a virtual machine's boot diagnostic logs.",
+          "examples": [],
+          "parameters": []
+        }
+      ]
+    },
+    {
+      "name": "diagnostics",
+      "help": "Configure the Azure Virtual Machine diagnostics extension.",
+      "commands": [
+        {
+          "name": "get-default-config",
+          "help": "Get the default configuration settings for a VM.",
+          "examples": [
+            {
+              "name": "Get the default diagnostics for a Linux VM and override the storage account name and the VM resource ID.",
+              "text": "az vm diagnostics get-default-config | sed \"s#__DIAGNOSTIC_STORAGE_ACCOUNT__#MyStorageAccount#g\" | sed \"s#__VM_OR_VMSS_RESOURCE_ID__#MyVmResourceId#g\""
+            },
+            {
+              "name": "Get the default diagnostics for a Windows VM.",
+              "text": "az vm diagnostics get-default-config --is-windows-os"
+            }
+          ],
+          "parameters": []
+        },
+        {
+          "name": "set",
+          "help": "Configure the Azure VM diagnostics extension.",
+          "examples": [],
+          "parameters": []
+        }
+      ]
+    },
+    {
+      "name": "encryption",
+      "help": "Manage encryption of VM disks.",
+      "commands": [
+        {
+          "name": "disable",
+          "help": "Disable disk encryption on the OS disk and/or data disks. Decrypt mounted disks.",
+          "examples": [],
+          "parameters": []
+        },
+        {
+          "name": "enable",
+          "help": "Enable disk encryption on the OS disk and/or data disks. Encrypt mounted disks.",
+          "examples": [],
+          "parameters": []
+        },
+        {
+          "name": "show",
+          "help": "Show encryption status.",
+          "examples": [],
+          "parameters": []
+        }
+      ]
+    },
+    {
+      "name": "availability-set",
+      "help": "Group resources into availability sets.",
+      "commands": [
+        {
+          "name": "create",
+          "help": "Create an Azure Availability Set. For more information, see https://learn.microsoft.com/azure/virtual-machines/availability.",
+          "examples": [
+            {
+              "name": "Create an availability set.",
+              "text": "az vm availability-set create -n MyAvSet -g MyResourceGroup --platform-fault-domain-count 2 --platform-update-domain-count 2"
+            }
+          ],
+          "parameters": []
+        }
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "name": "create",
+      "help": "Create an Azure Virtual Machine. For an end-to-end tutorial, see https://learn.microsoft.com/azure/virtual-machines/linux/quick-create-cli.",
+      "examples": [
+        {
+          "name": "Create a default Ubuntu2204 VM with automatic SSH authentication.",
+          "text": "az vm create -n MyVm -g MyResourceGroup --image Ubuntu2204"
+        },
+        {
+          "name": "Create a default RedHat VM with automatic SSH authentication using an image URN.",
+          "text": "az vm create -n MyVm -g MyResourceGroup --image RedHat:RHEL:7-RAW:7.4.2018010506"
+        },
+        {
+          "name": "Create a default Windows Server VM with a private IP address.",
+          "text": "az vm create -n MyVm -g MyResourceGroup --public-ip-address \"\" --image Win2012R2Datacenter"
+        },
+        {
+          "name": "Create a VM from a custom managed image.",
+          "text": "az vm create -g MyResourceGroup -n MyVm --image MyImage"
+        },
+        {
+          "name": "Create a VM by attaching to a managed operating system disk.",
+          "text": "az vm create -g MyResourceGroup -n MyVm --attach-os-disk MyOsDisk --os-type linux"
+        },
+        {
+          "name": "Create a simple Ubuntu Linux VM with a public IP address, DNS entry, two data disks (10GB and 20GB), and then generate RSA ssh key pairs.",
+          "text": "az vm create -n MyVm -g MyResourceGroup --public-ip-address-dns-name MyUniqueDnsName --image Ubuntu2204 --data-disk-sizes-gb 10 20 --size Standard_DS2_v2 --generate-ssh-keys"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "--image",
+          "type": "string",
+          "help": "The name of the operating system image as a URN alias, URN, custom image name or ID, custom image version ID, or VHD blob URI. In addition, it also supports shared gallery image. Please use the image alias including the version of the distribution you want to use. For example: please use Debian11 instead of Debian. This parameter is required unless using `--attach-os-disk.` Valid URN format: \"Publisher:Offer:Sku:Version\". For more information, see https://learn.microsoft.com/azure/virtual-machines/linux/cli-ps-findimage"
+        },
+        {
+          "name": "--ssh-key-values",
+          "type": "string",
+          "help": "Space-separated list of SSH public keys or public key file paths."
+        },
+        {
+          "name": "--computer-name",
+          "type": "string",
+          "help": "The host OS name of the virtual machine. Defaults to the name of the VM."
+        }
+      ]
+    },
+    {
+      "name": "install-patches",
+      "help": "Install patches on a VM.",
+      "examples": [
+        {
+          "name": "Install patches on a windows VM, allowing the maximum amount of time to be 4 hours, and the VM will reboot if required during the software update operation.",
+          "text": "az vm install-patches -g MyResourceGroup -n MyVm --maximum-duration PT4H --reboot-setting IfRequired --classifications-to-include-win Critical Security --exclude-kbs-requiring-reboot true"
+        },
+        {
+          "name": "Install patches on a linux VM, allowing the maximum amount of time to be 4 hours, and the VM will reboot if required during the software update operation.",
+          "text": "az vm install-patches -g MyResourceGroup -n MyVm --maximum-duration PT4H --reboot-setting IfRequired --classifications-to-include-linux Critical"
+        }
+      ],
+      "parameters": []
+    },
+    {
+      "name": "auto-shutdown",
+      "help": "Manage auto-shutdown for VM.",
+      "examples": [
+        {
+          "name": "Create auto-shutdown schedule for a VM.",
+          "text": "az vm auto-shutdown -g MyResourceGroup -n MyVm --time 1730 --email \"foo@bar.com\" --webhook \"https://example.com/\""
+        },
+        {
+          "name": "Delete auto-shutdown schedule for a VM.",
+          "text": "az vm auto-shutdown -g MyResourceGroup -n MyVm --off"
+        }
+      ],
+      "parameters": []
+    },
+    {
+      "name": "list-sizes",
+      "help": "List available sizes for VMs.",
+      "examples": [
+        {
+          "name": "List the available VM sizes in the West US region.",
+          "text": "az vm list-sizes -l westus"
+        }
+      ],
+      "parameters": []
+    }
+  ]
+}

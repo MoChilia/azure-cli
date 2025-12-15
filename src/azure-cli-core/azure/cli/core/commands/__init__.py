@@ -515,6 +515,10 @@ class AzCliCommandInvoker(CommandInvoker):
 
         # TODO: Can't simply be invoked as an event because args are transformed
         args = _pre_command_table_create(self.cli_ctx, args)
+        
+        # Fast path for `az --help` using pre-generated metadata (skip command table loading)
+        if self._try_fast_help(args):
+            return CommandResultItem(None, exit_code=0)
 
         self.cli_ctx.raise_event(EVENT_INVOKER_PRE_CMD_TBL_CREATE, args=args)
         self.commands_loader.load_command_table(args)
@@ -690,6 +694,50 @@ class AzCliCommandInvoker(CommandInvoker):
             event_data['result'],
             table_transformer=self.commands_loader.command_table[parsed_args.command].table_transformer,
             is_query_active=self.data['query_active'])
+
+    def _try_fast_help(self, args):
+        """Try to show fast help (metadata-based) for any `az <command> --help` without loading command table."""
+        from azure.cli.core.help_metadata_loader import has_metadata_for_command
+        from knack.log import CLILogging
+        
+        # Filter out debug flags
+        arg_check = [a for a in args if a not in
+                     (CLILogging.DEBUG_FLAG, CLILogging.VERBOSE_FLAG, CLILogging.ONLY_SHOW_ERRORS_FLAG)]
+        
+        # Check if this is a help request (ends with --help or -h)
+        if not arg_check or arg_check[-1] not in ('--help', '-h'):
+            return False
+        
+        # Extract command parts (everything except the help flag)
+        command_parts = arg_check[:-1]
+        
+        # Check if metadata exists for this command
+        if not has_metadata_for_command(command_parts):
+            logger.debug("Help metadata not available for '%s', using standard help", ' '.join(command_parts))
+            return False
+        
+        # Determine if this is a group or command
+        # For now, treat everything as a potential group (the help system will figure it out)
+        is_group = True
+        
+        # Show fast help without loading command table
+        try:
+            from azure.cli.core._help import AzCliHelp
+            help_inst = AzCliHelp(self.cli_ctx)
+            
+            # Call show_help with the command parts
+            # This will trigger the fast path in AzCliHelp.show_help
+            help_inst.show_help(self.cli_ctx.name, command_parts, None, is_group)
+            
+            # Set telemetry
+            command_str = ' '.join(command_parts) if command_parts else 'az'
+            telemetry.set_command_details(command_str)
+            telemetry.set_success(summary='help')
+            return True
+        except Exception as e:
+            logger.warning("Fast help failed for '%s', falling back to standard help: %s", 
+                          ' '.join(command_parts), e)
+            return False
 
     @staticmethod
     def _extract_parameter_names(args):

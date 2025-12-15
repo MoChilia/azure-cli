@@ -157,6 +157,10 @@ class AzCliHelp(CLIPrintMixin, CLIHelp):
         self._name_to_content = {}
 
     def show_help(self, cli_name, nouns, parser, is_group):
+        # Try fast help using per-module pre-generated metadata
+        if self._try_show_fast_help(cli_name, nouns, is_group):
+            return
+        
         self.update_loaders_with_help_file_contents(nouns)
 
         delimiters = ' '.join(nouns)
@@ -170,6 +174,162 @@ class AzCliHelp(CLIPrintMixin, CLIHelp):
         self._print_detailed_help(cli_name, help_file)
         from azure.cli.core.util import show_updates_available
         show_updates_available(new_line_after=True)
+    
+    def _try_show_fast_help(self, cli_name, nouns, is_group):
+        """Try to show help using per-module pre-generated metadata (much faster than loading command table)."""
+        try:
+            from azure.cli.core.help_metadata_loader import load_metadata_for_command
+            
+            # Load metadata for this command/group
+            metadata = load_metadata_for_command(nouns if nouns else [])
+            if not metadata:
+                logger.debug("Help metadata not available for '%s', falling back to standard help", ' '.join(nouns))
+                return False
+            
+            # Show fast help
+            if not nouns:
+                self._print_fast_root_help(cli_name, metadata)
+            else:
+                self._print_fast_group_help(cli_name, nouns, metadata, is_group)
+            
+            from azure.cli.core.util import show_updates_available
+            show_updates_available(new_line_after=True)
+            return True
+        except Exception as e:
+            logger.debug("Failed to show fast help, falling back to standard: %s", e)
+            return False
+    
+    def _print_fast_root_help(self, cli_name, metadata):
+        """Print root help using metadata (without loading command table)."""
+        from knack.help import _print_indent
+        
+        # Print header
+        print(self.welcome_message)
+        
+        # Get top-level groups (groups with no spaces in name)
+        groups = metadata.get('groups', {})
+        top_level_groups = {name: data for name, data in groups.items() if ' ' not in name}
+        
+        # Sort and display groups
+        if top_level_groups:
+            _print_indent('Group', 0)
+            sorted_groups = sorted(top_level_groups.items())
+            
+            max_name_length = max(len(name) for name, _ in sorted_groups) if sorted_groups else 0
+            
+            for name, data in sorted_groups:
+                summary = data.get('summary', '')
+                # Truncate long summaries
+                if len(summary) > 80:
+                    summary = summary[:77] + '...'
+                _print_indent(f"    {name.ljust(max_name_length + 2)} : {summary}", 0)
+            
+            print()
+        
+        # Print footer
+        print("For more specific examples and command details, use: az <command> --help")
+        print()
+    
+    def _print_fast_group_help(self, cli_name, nouns, metadata, is_group):
+        """Print group/command help using metadata, including parameters and examples."""
+        from knack.help import _print_indent
+        
+        command_str = ' '.join(nouns)
+        
+        # Print header
+        print()
+        print(f"Command")
+        _print_indent(f"{cli_name} {command_str}", 0)
+        
+        # Get info for this group/command
+        info = None
+        if is_group:
+            info = metadata.get('groups', {}).get(command_str)
+        else:
+            info = metadata.get('commands', {}).get(command_str)
+        
+        # Print summary
+        if info:
+            summary = info.get('summary', '')
+            if summary:
+                print()
+                print(summary)
+        
+        print()
+        
+        # For commands (not groups), show parameters and examples
+        if not is_group and info:
+            # Show parameters
+            parameters = info.get('parameters', [])
+            if parameters:
+                _print_indent('Arguments', 0)
+                for param in parameters:
+                    param_name = param.get('name', '')
+                    param_help = param.get('help', '')
+                    param_type = param.get('type', '')
+                    type_suffix = f' [{param_type}]' if param_type else ''
+                    _print_indent(f"    {param_name}{type_suffix}", 0)
+                    if param_help:
+                        # Wrap long help text
+                        _print_indent(f"        {param_help}", 0)
+                print()
+            
+            # Show examples
+            examples = info.get('examples', [])
+            if examples:
+                _print_indent('Examples', 0)
+                for idx, example in enumerate(examples, 1):
+                    example_name = example.get('name', '')
+                    example_text = example.get('text', '')
+                    if example_name:
+                        _print_indent(f"    {example_name}", 0)
+                    if example_text:
+                        _print_indent(f"        {example_text}", 0)
+                    if idx < len(examples):
+                        print()
+                print()
+        
+        # Show subgroups if this is a group
+        if is_group:
+            groups = metadata.get('groups', {})
+            prefix = command_str + ' '
+            subgroups = {name: data for name, data in groups.items() 
+                        if name.startswith(prefix) and ' ' not in name[len(prefix):]}
+            
+            if subgroups:
+                _print_indent('Subgroups:', 0)
+                sorted_subgroups = sorted(subgroups.items())
+                max_name_length = max(len(name[len(prefix):]) for name, _ in sorted_subgroups) if sorted_subgroups else 0
+                
+                for name, data in sorted_subgroups:
+                    subgroup_name = name[len(prefix):]
+                    summary = data.get('summary', '')
+                    if len(summary) > 80:
+                        summary = summary[:77] + '...'
+                    _print_indent(f"    {subgroup_name.ljust(max_name_length + 2)} : {summary}", 0)
+                print()
+            
+            # Show commands in this group
+            commands = metadata.get('commands', {})
+            group_commands = {name: data for name, data in commands.items() 
+                            if name.startswith(prefix) and ' ' not in name[len(prefix):]}
+            
+            if group_commands:
+                _print_indent('Commands:', 0)
+                sorted_commands = sorted(group_commands.items())
+                max_name_length = max(len(name[len(prefix):]) for name, _ in sorted_commands) if sorted_commands else 0
+                
+                for name, data in sorted_commands:
+                    cmd_name = name[len(prefix):]
+                    summary = data.get('summary', '')
+                    if len(summary) > 80:
+                        summary = summary[:77] + '...'
+                    _print_indent(f"    {cmd_name.ljust(max_name_length + 2)} : {summary}", 0)
+                print()
+        
+        # Print footer
+        print("For more details, use: az <command> --help")
+        print()
 
     def get_examples(self, command, parser, is_group):
         """Get examples of a certain command from the help file.
